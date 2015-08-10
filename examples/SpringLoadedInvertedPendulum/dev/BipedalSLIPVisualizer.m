@@ -1,23 +1,25 @@
 classdef BipedalSLIPVisualizer < Visualizer
     
-    %might need to create a properties function here
+    % the visualization of the bipedalSLIP model
     
     methods
         function obj = BipedalSLIPVisualizer(slip)
-            typecheck(slip,'BipedalSLIP');
+            typecheck(slip,'BipedalSLIPDoubleSupport');
             obj = obj@Visualizer(getOutputFrame(slip));
         end
         
         %function obj = BipedalSLIPVisualizer()
-        %obj = obj@Visualizer([]);
+        %   obj = obj@Visualizer([]);
         %end % a debugging visualizer function
         
         function draw(obj,~,x) %(obj,t,x) where x is a 1x6 matrix
             hip = x(1:2); % position of the hip
-            r1 = x(3); % length of 1st spring leg
-            theta = x(4); % angle of 1st spring leg
-            r2 = x(5); % length of 2nd spring leg
-            theta2 = x(6); % angle of 2nd spring leg
+            d1 = 0.25;
+            d2 = 1;
+            r1 = sqrt((x(1)-d1)^2+x(2)^2);
+            r2 = sqrt((x(1)-d2)^2+x(2)^2);
+            theta = atan2(x(2),d1-x(1));
+            theta2 = atan2(x(2),d2-x(1));
             
             clf
             
@@ -26,15 +28,15 @@ classdef BipedalSLIPVisualizer < Visualizer
             lx = [0,.3,.5*lx+.3,.8,1];
             ly = [0,0,ly,0,0];
             
-            R = rotmat(theta-pi/2);
-            lpts = repmat(hip,1,numel(lx))+R*[r1*lx;ly];
-            plot(lpts(1,:),lpts(2,:),'Color',[0 0 0],'LineWidth',2);
-            
+            %R = rotmat(theta+pi);
+            %lpts = repmat(hip,1,numel(lx))+R*[r1*lx;ly];
+            %plot(lpts(1,:),lpts(2,:),'Color',[0 0 0],'LineWidth',2);
+            line([d1,hip(1)], [0, hip(2)]);
             hold on
-            
-            R2 = rotmat(theta2-pi/2);
-            lpts = repmat(hip,1,numel(lx))+R2*[(r2)*lx;ly];
-            plot(lpts(1,:),lpts(2,:),'Color',[0 0 0],'LineWidth',2);
+             line([d2,hip(1)], [0, hip(2)]);
+            %R2 = rotmat(theta2+pi);
+            %lpts = repmat(hip,1,numel(lx))+R2*[(r2)*lx;ly];
+            %plot(lpts(1,:),lpts(2,:),'Color',[0 0 0],'LineWidth',2);
             
             
             t = 0:0.1:2*pi;
