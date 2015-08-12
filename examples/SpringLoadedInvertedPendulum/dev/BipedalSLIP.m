@@ -1,80 +1,80 @@
 classdef BipedalSLIP < HybridDrakeSystem
-    
-    % spring loaded inverted pendulum, control input is the angle of attack
+    % a script combining all of the other classes
+    % spring loaded inverted pendulum, the control input (aka 'u') is the 'angle of
+    % attack'
     
     properties
-        m=80;  % mass (kg)
-        r0=1; % rest length of leg spring (m)
-        k=14000; % stiffness spring coefficient
-        g=9.81; % gravity (m/s^2)
+        rest_l1 = 1; % rest length of leg spring #2 (m)
+        rest_l2 = 1; % rest length of leg spring #2 (m)
+        
+        m_hip = 1; % mass (kg)
+        k = 100; % stiffness spring coefficient (aka elastic restoring force)
+        g = 9.81; % gravity (m/s^2)
+        alpha0 = pi/3; % the fixed leg orientation (for swing phases) with respect to gravity aka the angle of attack
+        
         stopAtApex = 0;
-        lmax = 3;
     end
     
-    % do apex i (left single support) to apex i + 1 (right single support)
-    
+    properties (Constant)
+        % these values go with the static methods and will say whether we are walking or running
+        walking_v = 1.5; % an example of a walking velocity (m/s)
+        walking_angle = 76; % an example of a walking angle of attack (degrees)
+        running_v = 3; % an example of a running velocity (m/s)
+        running_angle = 81; % an example of a running angle of attack (degrees) NOTE: THE CODE DEOS NOT LIKE 81, CHANGE TO DIF #
+    end
+
     methods
         function obj = BipedalSLIP()
             
-            obj = obj@HybridDrakeSystem(1,12);
-            obj = setInputFrame(obj,CoordinateFrame('SLIPInput',1,'u',{'angle_of_attack'}));
+            obj = obj@HybridDrakeSystem(...
+                1, ... % number of inputs
+                12); % number of outputs
+            
+            obj = setInputFrame(obj,CoordinateFrame('SLIPInput',1,'u',{'alpha0'})); % alpha0 is the angle of attack
             obj = setOutputFrame(obj,CoordinateFrame('SLIPOutput',12,'y',{'x','y','r1','theta1','r2','theta2','xdot','ydot','r1dot','theta1dot','r2dot','theta2dot'}));
             
             pFlight=BipedalSLIPFlight(obj);
-            [obj, pf_mode]=obj.addMode(pFlight);
-            pSingleSupport=BipedalSLIPSingleSupport(obj);
+            [obj, pf_mode]=obj.addMode(pFlight); % where both legs are in the air
+            
+            pSingleSupport=BipedalSLIPSingleSupport(obj); % where one leg is on the ground
             [obj, ps_mode]=obj.addMode(pSingleSupport);
-            pDoubleSupport=BipedalSLIPDoubleSupport(obj);
+            
+            pDoubleSupport=BipedalSLIPDoubleSupport(obj); % where both legs are on the ground
             [obj, pd_mode]=obj.addMode(pDoubleSupport);
             
             obj=addTransition(obj,pf_mode,@collisionGuard,@flight2stance,true,true);
             obj=addTransition(obj,ps_mode,andGuards(obj,@takeOffGuard1A,@takeOffGuard1B),@stance2flight,false,true);
-            %             obj = obj@HybridDrakeSystem(...
-%                 1, ... % number of inputs
-%                 12); % number of outputs
-%             obj = setInputFrame(obj,CoordinateFrame('BipedalSLIPInput',1,'u',{'angle_of_attack'}));
-%             obj = setOutputFrame(obj,CoordinateFrame('BipedalSLIPOutput',12,'y',{'x','y','r1','theta1','r2','theta2','xdot','ydot','r1dot','theta1dot','r2dot','theta2dot'})); % r1: length of 1st spring leg
-%             
-%             pFlight = BipedalSLIPFlight(obj); % where both legs are in the air
-%             [obj, pf_mode] = obj.addMode(pFlight);
-%             
-%             pSingleSupport = BipedalSLIPSingleSupport(obj); % where one leg is on the ground
-%             obj = obj.addMode(pSingleSupport);
-%             %obj.leftSingleSupport = slip.left.SingleSupport;
-%             %obj.rightSingleSupport = slip.right.SingleSupport;
-%             
-%             pDoubleSupport = BipedalSLIPDoubleSupport(obj); % where both legs are on the ground
-%             obj = obj.addMode(pDoubleSupport);
-%             %obj.leftDoubleSupport = slip.leftDoubleSupport;
-%             %obj.rightDoubleSupport = slip.rightDoubleSupport;
-%             
-%             obj=addTransition(obj,pFlight,@collisionGuard,@flight2stance,true,true);
-%       obj=addTransition(obj,pSingleSupport,andGuards(obj,@takeOffGuard1,@takeOffGuard2),@stance2flight,false,true);
-%             
-% %             obj = addTransition(obj,pf_mode,andGuards(obj,@flight2SingleGuard,@single2FlightGuard),@flightDynamics,true,true);
-% %             obj = addTransition(obj,pSingleSupport,@takeOffGuard1A,@singleSupportDynamics,true,true);
-% %             obj = addTransition(obj,pDoubleSupport,andGuards(obj,@double2SingleGuard,@single2DoubleGuard),@doubleSupportDynamics,true,true);
-%             
+            % running mode
+            
+%             obj=addTransition(obj,pd_mode,andGuards(obj,@double2SingleGuard,@single2DoubleGuard),@double2single,true,true);
+%             obj=addTransition(obj,ps_mode,@collisionGuard,@single2double,true,true);
+%             % walking mode
+            
+            % obj = addTransition(obj,pf_mode,andGuards(obj,@flight2SingleGuard,@single2FlightGuard),@flightDynamics,true,true);
+            % obj = addTransition(obj,pSingleSupport,@takeOffGuard1A,@singleSupportDynamics,true,true);
+            % obj = addTransition(obj,pDoubleSupport,andGuards(obj,@double2SingleGuard,@single2DoubleGuard),@doubleSupportDynamics,true,true);
+            
+            % use if y==l0 for taking off and switching between single and double
         end
         
         function [g,dg]=collisionGuard(obj,~,x,u) %(obj,t,x,u)
-            g=x(2)-obj.r0*cos(u);  % foot hits the ground
-            dg=[0 0 1 0 0 obj.r0*sin(u)];
+            g=x(2)-obj.rest_l1*cos(obj.alpha0);  % foot hits the ground
+            dg=[0 1 0 0 0 0 zeros(1,6)];
         end
         
         function [g,dg]=takeOffGuard1A(obj,~,x,~) %(obj,t,x,u)
-            g=obj.r0-x(1);  % r >= r0
-            dg=[0 -1 0 0 0 0];
+            g=obj.rest_l1-x(3);  % r >= l0
+            dg=[0 -1 0 0 0 0 zeros(1,6)];
         end
         
         function [g,dg]=takeOffGuard1B(~,~,x,~) %(obj,t,x,u)
-            g=-x(3);  % rdot >= 0
-            dg=[0 0 0 -1 0 0];
+            g=-x(9);  % rdot >= 0
+            dg=[zeros(1,6) 0 0 -1 0 0 0];
         end
         
         function [g,dg]=apexGuard(~,~,x,~) %(obj,t,x,u)
-            g=x(4);  % ydot <= 0
-            dg=[0 0 0 0 1 0];
+            g=x(8);  % ydot <= 0
+            dg=[0 0 0 0 0 0 0 0 1 0 0 0 0];
         end
         
         function [xp,mode,status,dxp]=stance2flight(~,mode,~,xm,~) %(obj,t,x,u)
@@ -114,12 +114,12 @@ classdef BipedalSLIP < HybridDrakeSystem
                 mode=2;
             end
             theta=u;
-            r= xm(2)/cos(theta); % = obj.r0 because x(2)-obj.r0*cos(u) = 0
+            r= xm(2)/cos(theta); % = obj.rest_l1 because x(2)-obj.rest_l1*cos(u) = 0
             xp=[r;...
                 theta;...
                 -xm(3)*sin(theta)+xm(4)*cos(theta);...
                 -(xm(3)*cos(theta)+xm(4)*sin(theta))/r;...
-                xm(1)+r*sin(theta)]; %xm(2)*tan(theta)];
+                xm(1)+r*sin(theta);0;0;0;0;0;0;0]; %xm(2)*tan(theta)];
             status=0;
             if nargout>3
                 dxpdxm=zeros(5,4);
@@ -151,7 +151,7 @@ classdef BipedalSLIP < HybridDrakeSystem
                 mode=1;
             end
             xp=xm;
-            if(xp(2)<obj.r0*cos(u))
+            if(xp(2)<obj.rest_l1*cos(u))
                 error('toe touches ground at apex')
             end
             status=obj.stopAtApex;
@@ -190,83 +190,30 @@ classdef BipedalSLIP < HybridDrakeSystem
             aoaControl=@(theta) obj.apex2apex(theta,y0,xdot0)-yd;
             theta=fzero(aoaControl,pi/8);
         end
-        
-        %         function b1 = BipedalSLIPWalking(obj, pSingleSupport, pDoubleSupport) %walking
-        %
-        %             if pSingleSupport<0
-        %                 pSingleSupport = obj.leftSingleSupport;
-        %             elseif pSingleSupport>0
-        %                 pSingleSupport = obj.rightSingleSupport;
-        %             else
-        %                 error('Incorrect usage of BipedalSLIPSingleSupport walking mode')
-        %             end
-        %
-        %             if pDoubleSupport>0
-        %                 pDoubleSupport = obj.leftDoubleSupport;
-        %             elseif pDoubleSupport<0
-        %                 pDoubleSupport = obj.rightDoubleSupport;
-        %             else
-        %                 pDoubleSupport = 0;
-        %                 error('Incorrect usage of BipedalSLIPDoubleSupport walking mode')
-        %             end
-        %
-        %         end
-        %
-        %         function b2 = BipedalSLIPRunning(obj, pFlight, pSingleSupport, pDoubleSupport) %running
-        %
-        %             if pSingleSupport<0
-        %                 pSingleSupport = obj.leftSingleSupport;
-        %             elseif pSingleSupport>0
-        %                 pSingleSupport = obj.rightSingleSupport;
-        %             else
-        %                 error('Incorrect usage of BipedalSLIPSingleSupport running mode')
-        %             end
-        %
-        %             if pDoubleSupport>0
-        %                 pDoubleSupport = obj.leftDoubleSupport;
-        %             elseif pDoubleSupport<0
-        %                 pDoubleSupport = obj.rightDoubleSupport;
-        %             else
-        %                 error('Incorrect usage of BipedalSLIPDoubleSupport running mode')
-        %             end
-        %
-        %         end
-        
     end
     
     methods (Static)
-        function ndV = ndSpeed(v)
-
-            ndV = (v)*(1/sqrt(obj.g*obj.lmax));
+        function run(v, alpha0) % alpha0 is the angle of attack
             
-            if ndV>=0.65
-                if ndL>=0.95
-                   display('Flight is used (running)')
-                else
-                   display('Flight is not used (walking)')
-                end
-            elseif ndV<0.65
-                if ndL>0.95
-                    display('Flight is used (running)')
-                else
-                    display('Flight is not used (walking)')
-                end   
-            end
-        end
-        % use adjusting graph in pdf to determine this
-        % stance/flight variability in walking vs. running
-        
-        function ndL = ndLength(d)
-            ndL = d/obj.lmax;
-        end
-        
-        function run()
+            assert(abs(v-BipedalSLIP.walking_v) < 1e-10 || abs(v-BipedalSLIP.running_v) < 1e-10);
+            assert(abs(alpha0-BipedalSLIP.walking_angle) < 1e-10 || abs(alpha0-BipedalSLIP.running_angle) < 1e-10);
+            
+            %             if abs(velocity-obj.walking_v) < 1e-10
+            %                 alpha0 = obj.walking_angle;
+            %             elseif abs(velocity-obj.running_v) < 1e-10
+            %                 alpha0 = obj.running_angle;
+            %             end
+            
             r = BipedalSLIP();
-            v = BipedalSLIPVisualizer(r);
+            vis = BipedalSLIPVisualizer(r);
+            x0 = r.getInitialState();
+            x0(7) = v;
             
-            aoa_command = setOutputFrame(ConstantTrajectory(.51),getInputFrame(r));
-            ytraj = simulate(cascade(aoa_command,r),[0 5]);
-            v.playback(ytraj,struct('slider','true'));
+            aoa_command = setOutputFrame(ConstantTrajectory(alpha0),getInputFrame(r));
+            ytraj = simulate(cascade(aoa_command,r),[0 11], x0);
+            vis.playback(ytraj,struct('slider','true'));
+            
+            
         end
     end
 end

@@ -1,12 +1,14 @@
-classdef BipedalSLIPSingleSupport < DrakeSystem % where one leg is on the ground
+classdef BipedalSLIPSingleSupport < DrakeSystem
+    % where one leg is on the ground
     
     properties
-        m = 80; % mass (kg)
-        r0; % rest length of leg spring (m)
-        k = 14000; % stiffness spring coefficient
+        rest_l1 = 1; % rest length of leg spring #2 (m)
+        rest_l2 = 1; % rest length of leg spring #2 (m)
+        
+        m_hip = 1; % mass (kg)
+        k = 100; % stiffness spring coefficient (aka elastic restoring force)
         g = 9.81; % gravity (m/s^2)
-        a0; % the constant orientation (for swing phases) with respect to gravity
-        l = 1;
+        alpha0 = pi/3; % the fixed leg orientation (for swing phases) with respect to gravity aka the angle of attack
     end
     
     methods
@@ -17,13 +19,17 @@ classdef BipedalSLIPSingleSupport < DrakeSystem % where one leg is on the ground
                 4, ... % number of continuous states
                 0, ... % number of discrete states
                 1, ... % number of inputs
-                12, ... % number of outputs
+                4, ... % number of outputs
                 true, ... % direct feedthrough
-                true); % time invariant 
-            obj.m = slip.m;
-            obj.r0 = slip.r0;
+                true); % time invariant
+            
+            obj.rest_l1 = slip.rest_l1;
+            obj.rest_l2 = slip.rest_l2;
+            
+            obj.m_hip = slip.m_hip;
             obj.k = slip.k;
             obj.g = slip.g;
+            obj.alpha0 = slip.alpha0;
             
             obj = setStateFrame(obj,CoordinateFrame('BipedalSLIPSingleSupport',4,'x',{'x','y','xdot','ydot'}));
             
@@ -31,42 +37,51 @@ classdef BipedalSLIPSingleSupport < DrakeSystem % where one leg is on the ground
             obj = setOutputFrame(obj,getOutputFrame(slip));
         end
         
-        % if left single support
-        % then ____
-        % else if right single support
-        % then ____
-        
-        
-        function [xdot,df] = dynamics(obj,~,x,~) %(obj,t,x,u)
-            xdot = [x(2,:); obj.g*sin(x(1,:))/obj.l; 0*x(3,:)];
-            if nargout>1,
-                df = [zeros(3,1), [0, 1, 0; obj.g*cos(x(1))/obj.l, 0, 0; zeros(1,3)]];
-            end
+        function  x0=getInitialState(~)
+            x0=[0.45;1;0;0];
         end
         
-        function thetadot = orbit(obj,theta,E)
-            if nargin<3
-                E = obj.m*obj.g*obj.l;
-            end % homoclinic
-            thetadot = sqrt(2*(E - obj.m*obj.g*obj.l*cos(theta))./(obj.m*obj.l^2));
+        function xdot = dynamics(obj,~,x,~) %(obj,t,x,u)
+            yfoot1 = 0;
+            xfoot1 = 0.25;
+            % yfoot2 = 0;
+            % xfoot2 = 0.25;
+            
+            if yfoot1 == 0
+                r1 = sqrt((x(1)-xfoot1)^2+x(2)^2);
+                r2 = 1;
+                
+                theta1 = atan2(x(2),xfoot1-x(1));
+                theta2 = obj.alpha0;
+                
+                % xfoot1 = x(1)+((x(2)*cos(theta1))/sin(theta1));
+                yfoot2 = x(2)-(r2*sin(theta2));
+                xfoot2 = x(1)+(r2*cos(theta2));
+                
+                F1 = [obj.k*(r1-obj.rest_l1)*cos(theta1);-obj.k*(r1-obj.rest_l1)*sin(theta1)];
+                F3 = [0;-obj.m_hip*obj.g];
+                xdot = [x(3:4);(F1+F3)/obj.m_hip];
+                
+            elseif yfoot2 == 0
+                r2 = sqrt((x(1)-xfoot2)^2+x(2)^2);
+                r1 = 1;
+                
+                theta2 = atan2(x(2),xfoot2-x(1));
+                theta1 = obj.alpha0;
+                
+                % xfoot2 = x(1)+((x(2)*cos(theta2))/sin(theta2));
+                yfoot1 = x(2)-(r1*sin(theta1));
+                xfoot1 = x(1)+(r1*cos(theta1));
+                
+                F2 = [obj.k*(r2-obj.rest_l2)*cos(theta2);-obj.k*(r2-obj.rest_l2)*sin(theta2)];
+                F3 = [0;-obj.m_hip*obj.g];
+                xdot = [x(3:4);(F2+F3)/obj.m_hip];
+            end
         end
         
         function [y,dy] = output(~,~,x,~) %(obj,t,x,u)
             y = x;
             dy = [zeros(3,1),eye(3)];
         end
-        
-        function x0 = getInitialState(~) %(obj)
-            x0 = [0.1*randn; 20*randn; 0];
-        end
-        % need to keep looking through the papers to find the right
-        % equation that goes with this function, find
-        % out the right inputs as well...
-        % THE FUNCTION IS FOR WHEN THE MODEL IS ONLY ON ONE LEG, THEN THE
-        % DOUBLE SUPPORT WILL BE FOR WHEN IT'S TWO!!!!! IN GEYER PDF, Look at Appendix A-D
-        % and Figure 2 and Figure 4 description, 6: Discussion Walking vs
-        % running = single and double support vs flight and stance running
-        % THEN, IN NATURE PDF, look at methods and flight vs stance:
-        % keywords = single, double, flight, stance
     end
 end
