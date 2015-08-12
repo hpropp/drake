@@ -3,8 +3,10 @@ classdef BipedalSLIPFlight < DrakeSystem
     % if no flight function used, it is walking; if there is one, then running
     
     properties
-        m_hip = 1; % mass (kg)
-        g = 9.81; % gravity (m/s^2)
+        rest_l1; % rest length of leg spring #2 (m)
+        rest_l2; % rest length of leg spring #2 (m)
+        m_hip; % mass (kg)
+        g; % gravity (m/s^2)
     end
     
     methods
@@ -15,10 +17,12 @@ classdef BipedalSLIPFlight < DrakeSystem
                 4, ... % number of continuous states
                 0, ... % number of discrete states
                 1, ... % number of inputs
-                4, ... % number of outputs
+                12, ... % number of outputs
                 true, ... % direct feedthrough
                 true); % time invariant
             
+            obj.rest_l1 = slip.rest_l1;
+            obj.rest_l2 = slip.rest_l2;
             obj.m_hip = slip.m_hip;
             obj.g = slip.g;
             
@@ -28,13 +32,13 @@ classdef BipedalSLIPFlight < DrakeSystem
             obj = setOutputFrame(obj,getOutputFrame(slip));
         end
         
-        function xdot = dynamics(obj,~,x,~) %(obj,t,x,u), u because need to control the leg angles
-            r1 = 1;
-            r2 = 1;
+        function xdot = dynamics(obj,~,x,~) %(obj,t,x,u)
+            r1 = obj.rest_l1;
+            r2 = obj.rest_l2;
             
             xfoot1 = 0.75; % x position of r1
-            xfoot2 = 1.25; % x position of r2
             yfoot1 = x(2)-sqrt((r1^2)-((x(1)-xfoot1)^2)); % y position of r1
+            xfoot2 = 1.25; % x position of r2
             yfoot2 = x(2)-sqrt((r1^2)-((x(1)-xfoot2)^2)); % y position of r2
             
             theta1 = atan2(sqrt((r1^2)-((x(1)-xfoot1)^2)),xfoot1-x(1));
@@ -42,14 +46,19 @@ classdef BipedalSLIPFlight < DrakeSystem
             
             F3 = [0;-obj.m_hip*obj.g];
             xdot = [x(3:4);(F3)/obj.m_hip];
-        end
-        
-        function y = output(~,~,x,~) %(obj,t,x,u)
-            y = x;
+            
+            output(obj,t,x,u);
+            function y = output(~,~,x,~) %(obj,t,x,u)
+                y = [x(1:2);r1;theta1;r2;theta2;x(3:4);0;0;0;0]; % find out values of the last four
+                xfoot1;
+                yfoot1;
+                xfoot2;
+                yfoot2;
+            end
         end
         
         function x0 = getInitialState(~) %(obj)
-            x0 = [0.1*randn; 20*randn; 0];
+            x0 = [0.1*randn;20*randn;0];
         end
     end
 end

@@ -2,12 +2,11 @@ classdef BipedalSLIPDoubleSupport < DrakeSystem
     % where both legs are on the ground
     
     properties
-        rest_l1 = 1; % rest length of leg spring #2 (m)
-        rest_l2 = 1; % rest length of leg spring #2 (m)
-        
-        m_hip = 1; % mass (kg)
-        k = 100; % stiffness spring coefficient (aka elastic restoring force)
-        g = 9.81; % gravity (m/s^2)
+        rest_l1; % rest length of leg spring #2 (m)
+        rest_l2; % rest length of leg spring #2 (m)
+        m_hip; % mass (kg)
+        k; % stiffness spring coefficient (aka elastic restoring force)
+        g; % gravity (m/s^2)
     end
     
     methods
@@ -18,13 +17,12 @@ classdef BipedalSLIPDoubleSupport < DrakeSystem
                 4,... % number of continuous states
                 0, ... % number of discrete states
                 1, ... % number of inputs
-                4, ... % number of outputs
+                12, ... % number of outputs
                 true, ... % direct feedthrough
                 true); % time invariant
             
             obj.rest_l1 = slip.rest_l1;
             obj.rest_l2 = slip.rest_l2;
-            
             obj.m_hip = slip.m_hip;
             obj.k = slip.k;
             obj.g = slip.g;
@@ -50,14 +48,19 @@ classdef BipedalSLIPDoubleSupport < DrakeSystem
             F2 = [obj.k*(r2-obj.rest_l2)*cos(theta2);-obj.k*(r2-obj.rest_l2)*sin(theta2)];
             F3 = [0;-obj.m_hip*obj.g];
             xdot = [x(3:4);(F1+F2+F3)/obj.m_hip];
-        end
-        
-        function y = output(~,~,x,~) %(obj,t,x,u)
-            y = x;
+            
+            output(obj,t,x,u);
+            function y = output(~,~,x,~) %(obj,t,x,u)
+                y = [x(1:2);r1;theta1;r2;theta2;x(3:4);0;0;0;0]; % find out values of the last four
+                xfoot1;
+                yfoot1;
+                xfoot2;
+                yfoot2;
+            end
         end
         
         function x0 = getInitialState(~) %(obj)
-            x0 = [0.1*randn; 20*randn; 0];
+            x0 = [0.1*randn;20*randn;0];
         end
     end
 end

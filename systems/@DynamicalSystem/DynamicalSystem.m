@@ -453,7 +453,7 @@ classdef DynamicalSystem
       obj.output_frame=fr;
     end
     
-    function n = getNumStateConstraints(obj);
+    function n = getNumStateConstraints(obj)
       % Returns the scalar number of state constraints (of the form phi(x)=0)
       n = 0;  % default behavior is n=0
     end
