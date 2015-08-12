@@ -247,7 +247,9 @@ classdef DynamicalSystem
       % @param tsout the sample times of the output
       % @retval newsys the new, sampled-data system
       % See getSampleTime for more details about sample times.
-      if (nargin<3) tsout = tsin; end
+      if (nargin<3) 
+          tsout = tsin; 
+      end
       typecheck(tsin,'double'); 
       sizecheck(tsin,[1 1]);
       typecheck(tsout,'double');
@@ -421,7 +423,9 @@ classdef DynamicalSystem
       % @param fr CoordinateFrame object which must have the correct
       % dimension
       typecheck(fr,'CoordinateFrame');
-      if (fr.dim ~= obj.getNumInputs()) error('frame dimension does not match number of inputs'); end
+      if (fr.dim ~= obj.getNumInputs()) 
+          error('frame dimension does not match number of inputs'); 
+      end
       obj.input_frame=fr;
     end
     function fr=getStateFrame(obj)
@@ -435,7 +439,9 @@ classdef DynamicalSystem
       % @param fr CoordinateFrame object which must have the correct
       % dimension
       typecheck(fr,'CoordinateFrame');
-      if (fr.dim ~= obj.getNumStates()) error('frame dimension does not match number of states'); end
+      if (fr.dim ~= obj.getNumStates()) 
+          error('frame dimension does not match number of states'); 
+      end
       obj.state_frame=fr;
     end
     function fr=getOutputFrame(obj)
@@ -449,7 +455,9 @@ classdef DynamicalSystem
       % @param fr CoordinateFrame object which must have the correct
       % dimension
       typecheck(fr,'CoordinateFrame');
-      if (fr.dim ~= obj.getNumOutputs()) error('frame dimension does not match number of outputs'); end
+      if (fr.dim ~= obj.getNumOutputs()) 
+          error('frame dimension does not match number of outputs'); 
+      end
       obj.output_frame=fr;
     end
     
@@ -486,13 +494,17 @@ classdef DynamicalSystem
       % parameters.
       % Note that this supports many of the same parameter values that you
       % would send to odeset.
-      if (mod(length(varargin),2)) error('invalid input'); end        
+      if (mod(length(varargin),2)) 
+          error('invalid input'); 
+      end        
       i=1;
       while(i<length(varargin))
         if (length(varargin{i+1})==0) 
           obj.simulink_params = rmfield(obj.simulink_params,varargin{i});
         else
-          if (~ischar(varargin{i+1})) error('simulink params should all be strings (unfortunately)'); end
+          if (~ischar(varargin{i+1})) 
+              error('simulink params should all be strings (unfortunately)'); 
+          end
           obj.simulink_params = setfield(obj.simulink_params,varargin{i},varargin{i+1});
           set_param(obj.getModel(),varargin{i},varargin{i+1});
         end
@@ -648,8 +660,13 @@ classdef DynamicalSystem
       % @param xv the state (in vector form)
       % @param mdl optional - pass in a model (default: getModel(obj))
       
-      if (getNumStates(obj)<1) xs=[]; return; end
-      if (nargin<3) mdl = getModel(obj); end
+      if (getNumStates(obj)<1) 
+          xs=[]; 
+          return; 
+      end
+      if (nargin<3) 
+          mdl = getModel(obj); 
+      end
       
       if (isempty(obj.structured_x))
         obj.structured_x = getSimulinkStateStructure(mdl.name);
