@@ -7,6 +7,11 @@ classdef BipedalSLIPFlight < DrakeSystem
         rest_l2; % rest length of leg spring #2 (m)
         m_hip; % mass (kg)
         g; % gravity (m/s^2)
+        
+        xfoot1; % x position of r1
+        xfoot2; % x position of r2
+        yfoot1; % y position of r1
+        yfoot2; % y position of r2
     end
     
     methods
@@ -26,6 +31,11 @@ classdef BipedalSLIPFlight < DrakeSystem
             obj.m_hip = slip.m_hip;
             obj.g = slip.g;
             
+            obj.xfoot1 = slip.xfoot1; % x position of r1
+            obj.xfoot2 = slip.xfoot2; % x position of r2
+            obj.yfoot1 = slip.yfoot1; % y position of r1
+            obj.yfoot2 = slip.yfoot2; % y position of r2
+            
             obj = setStateFrame(obj,CoordinateFrame('BipedalSLIPFlight',4,'x',{'x','y','xdot','ydot'}));
             
             obj = setInputFrame(obj,getInputFrame(slip));
@@ -36,24 +46,25 @@ classdef BipedalSLIPFlight < DrakeSystem
             r1 = obj.rest_l1;
             r2 = obj.rest_l2;
             
-            xfoot1 = 0.75; % x position of r1
-            yfoot1 = x(2)-sqrt((r1^2)-((x(1)-xfoot1)^2)); % y position of r1
-            xfoot2 = 1.25; % x position of r2
-            yfoot2 = x(2)-sqrt((r1^2)-((x(1)-xfoot2)^2)); % y position of r2
+            obj.xfoot1 = 0.75; % x position of r1
+            obj.yfoot1 = x(2)-sqrt((r1^2)-((x(1)-obj.xfoot1)^2)); % y position of r1
+            obj.xfoot2 = 1.25; % x position of r2
+            obj.yfoot2 = x(2)-sqrt((r1^2)-((x(1)-obj.xfoot2)^2)); % y position of r2
             
-            theta1 = atan2(sqrt((r1^2)-((x(1)-xfoot1)^2)),xfoot1-x(1));
-            theta2 = atan2(sqrt((r2^2)-((x(1)-xfoot2)^2)),xfoot2-x(1));
+            theta1 = atan2(sqrt((r1^2)-((x(1)-obj.xfoot1)^2)),obj.xfoot1-x(1)); 
+            theta2 = atan2(sqrt((r2^2)-((x(1)-obj.xfoot2)^2)),obj.xfoot2-x(1)); 
             
             F3 = [0;-obj.m_hip*obj.g];
             xdot = [x(3:4);(F3)/obj.m_hip];
             
             output(obj,t,x,u);
             function y = output(~,~,x,~) %(obj,t,x,u)
-                y = [x(1:2);r1;theta1;r2;theta2;x(3:4);0;0;0;0]; % find out values of the last four
-                xfoot1;
-                yfoot1;
-                xfoot2;
-                yfoot2;
+                r1dot = 0;
+                theta1dot = x(3)/sqrt((r1^2)-((x(1)-obj.xfoot1)^2));
+                r2dot = 0;
+                theta2dot = x(3)/sqrt((r2^2)-((x(1)-obj.xfoot2)^2));
+                
+                y = [x(1:2);r1;theta1;r2;theta2;x(3:4);r1dot;theta1dot;r2dot;theta2dot];
             end
         end
         

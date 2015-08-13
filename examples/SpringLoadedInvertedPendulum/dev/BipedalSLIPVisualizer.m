@@ -1,10 +1,22 @@
 classdef BipedalSLIPVisualizer < Visualizer
     % the visualization of the bipedalSLIP model
     
+    properties
+        xfoot1; % x position of r1
+        xfoot2; % x position of r2
+        yfoot1; % y position of r1
+        yfoot2; % y position of r2
+    end
+    
     methods
         function obj = BipedalSLIPVisualizer(slip)
             typecheck(slip,'BipedalSLIP');
             obj = obj@Visualizer(getOutputFrame(slip));
+            
+            obj.xfoot1 = slip.xfoot1; % x position of r1
+            obj.xfoot2 = slip.xfoot2; % x position of r2
+            obj.yfoot1 = slip.yfoot1; % y position of r1
+            obj.yfoot2 = slip.yfoot2; % y position of r2
         end
         
         %function obj = BipedalSLIPVisualizer()
@@ -28,12 +40,12 @@ classdef BipedalSLIPVisualizer < Visualizer
             % plot(lpts(1,:),lpts(2,:),'Color',[0 0 0],'LineWidth',2);
             
             % the first spring leg, drawn without the spring
-            line([xfoot1, hip(1)], [yfoot1, hip(2)]);
+            line([obj.xfoot1, hip(1)], [obj.yfoot1, hip(2)]);
             
             hold on
             
             % the second spring leg, drawn without the spring
-            line([xfoot2, hip(1)], [yfoot2, hip(2)]);
+            line([obj.xfoot2, hip(1)], [obj.yfoot2, hip(2)]);
             
             % the second spring leg, drawn with the spring
             % R2 = rotmat(theta2+pi);
