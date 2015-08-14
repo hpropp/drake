@@ -43,29 +43,22 @@ classdef BipedalSLIPFlight < DrakeSystem
         end
         
         function xdot = dynamics(obj,~,x,~) %(obj,t,x,u)
-            r1 = obj.rest_l1;
-            r2 = obj.rest_l2;
-            
-            obj.xfoot1 = 0.75; % x position of r1
-            obj.yfoot1 = x(2)-sqrt((r1^2)-((x(1)-obj.xfoot1)^2)); % y position of r1
-            obj.xfoot2 = 1.25; % x position of r2
-            obj.yfoot2 = x(2)-sqrt((r1^2)-((x(1)-obj.xfoot2)^2)); % y position of r2
-            
-            theta1 = atan2(sqrt((r1^2)-((x(1)-obj.xfoot1)^2)),obj.xfoot1-x(1)); 
-            theta2 = atan2(sqrt((r2^2)-((x(1)-obj.xfoot2)^2)),obj.xfoot2-x(1)); 
-            
             F3 = [0;-obj.m_hip*obj.g];
             xdot = [x(3:4);(F3)/obj.m_hip];
+        end
+        
+        function y = output(obj,~,x,~) %(obj,t,x,u)
+            r1 = obj.rest_l1;
+            r2 = obj.rest_l2;
+            theta1 = atan2(sqrt((r1^2)-((x(1)-obj.xfoot1)^2)),obj.xfoot1-x(1));
+            theta2 = atan2(sqrt((r2^2)-((x(1)-obj.xfoot2)^2)),obj.xfoot2-x(1));
             
-            output(obj,t,x,u);
-            function y = output(~,~,x,~) %(obj,t,x,u)
-                r1dot = 0;
-                theta1dot = x(3)/sqrt((r1^2)-((x(1)-obj.xfoot1)^2));
-                r2dot = 0;
-                theta2dot = x(3)/sqrt((r2^2)-((x(1)-obj.xfoot2)^2));
-                
-                y = [x(1:2);r1;theta1;r2;theta2;x(3:4);r1dot;theta1dot;r2dot;theta2dot];
-            end
+            r1dot = 0;
+            theta1dot = x(3)./sqrt((r1^2)-((x(1)-obj.xfoot1)^2));
+            r2dot = 0;
+            theta2dot = x(3)./sqrt((r2^2)-((x(1)-obj.xfoot2)^2));
+            
+            y = [x(1:2);r1;theta1;r2;theta2;x(3:4);r1dot;theta1dot;r2dot;theta2dot];
         end
         
         function x0 = getInitialState(~) %(obj)

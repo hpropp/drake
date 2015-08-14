@@ -3,10 +3,6 @@ classdef BipedalSLIP < HybridDrakeSystem
     % spring loaded inverted pendulum, the control input (aka 'u') is the 'angle of
     % attack'
     
-    % use if y==l0 for taking off and switching between single and double
-    % and write the guards first, then the transitions, look at
-    % hybriddrakesystem, line 101
-    
     properties
         rest_l1 = 1; % rest length of leg spring #2 (m)
         rest_l2 = 1; % rest length of leg spring #2 (m)
@@ -30,46 +26,89 @@ classdef BipedalSLIP < HybridDrakeSystem
             obj = setInputFrame(obj,CoordinateFrame('SLIPInput',1,'u',{'alpha0'})); % alpha0 is the angle of attack
             obj = setOutputFrame(obj,CoordinateFrame('SLIPOutput',12,'y',{'x','y','r1','theta1','r2','theta2','xdot','ydot','r1dot','theta1dot','r2dot','theta2dot'}));
             
-            % flight mode (both legs in the air)
-            pFlight=BipedalSLIPFlight(obj);
-            [obj, pf_mode]=obj.addMode(pFlight);
-            
-            % singleSupport mode (one leg on the ground, one leg in the air)
-            pSingleSupport=BipedalSLIPSingleSupport(obj);
-            [obj, ps_mode]=obj.addMode(pSingleSupport);
-            
-            % doubleSupport mode, where both legs are on the ground
-            pDoubleSupport=BipedalSLIPDoubleSupport(obj);
-            [obj, pd_mode]=obj.addMode(pDoubleSupport);
-            
             if obj.alpha0 >= pi/3 % the model is walking
+                % singleSupport mode (one leg on the ground, one leg in the air)
+                pSingleSupport=BipedalSLIPSingleSupport(obj);
+                [obj, ps_mode]=obj.addMode(pSingleSupport);
+                
+                % doubleSupport mode, where both legs are on the ground
+                pDoubleSupport=BipedalSLIPDoubleSupport(obj);
+                [obj, pd_mode]=obj.addMode(pDoubleSupport);
+                
                 obj=addTransition(obj,ps_mode,@single2doubleGuard,@single2double,true,true,pd_mode);
                 obj=addTransition(obj,pd_mode,@double2SingleGuard,@double2single,true,true,ps_mode);
+                
+                obj.yfoot1 = 0;
+                obj.xfoot1 = 0.25;
             elseif obj.alpha0 < pi/3 % the model is running
+                % singleSupport mode (one leg on the ground, one leg in the air)
+                pSingleSupport=BipedalSLIPSingleSupport(obj);
+                [obj, ps_mode]=obj.addMode(pSingleSupport);
+                
+                % flight mode (both legs in the air)
+                pFlight=BipedalSLIPFlight(obj);
+                [obj, pf_mode]=obj.addMode(pFlight);
+                
                 obj=addTransition(obj,ps_mode,@stance2flightGuard,@stance2flight,true,true,pf_mode);
                 obj=addTransition(obj,pf_mode,@flight2stanceGuard,@flight2stance,true,true,ps_mode);
+                
+                obj.yfoot1 = 0;
+                obj.xfoot1 = 0.25;
             end
         end
         
         function guard_s2d = single2doubleGuard(obj,~,ps_x,~) %(obj,t,x,u)
-            guard_s2d = [obj.yfoot1;obj.yfoot2];
-            if theta1 == atan2(ps_x(2),obj.xfoot1-ps_x(1)) && theta2 == atan2(ps_x(2),obj.xfoot2-ps_x(1))
-                obj.yfoot1 = 0;
-                obj.yfoot2 = 0;
+            if obj.yfoot1 == 0 %obj.yfoot2~=0
+                theta1 = atan2(ps_x(2),obj.xfoot1-ps_x(1));
+                theta2 = obj.alpha0;
+                if theta1 == atan2(ps_x(2),obj.xfoot1-ps_x(1))
+                    if theta2 == atan2(ps_x(2),obj.xfoot2-ps_x(1))
+                        obj.yfoot1 = 0;
+                        obj.yfoot2 = 0;
+                    end
+                end
+            elseif obj.yfoot2 == 0 %obj.yfoot1~=0
+                theta1 = obj.alpha0;
+                theta2 = atan2(ps_x(2),obj.xfoot2-ps_x(1));
+                if theta1 == atan2(ps_x(2),obj.xfoot1-ps_x(1))
+                    if theta2 == atan2(ps_x(2),obj.xfoot2-ps_x(1))
+                        obj.yfoot1 = 0;
+                        obj.yfoot2 = 0;
+                    end
+                end
             end
+            
+            guard_s2d = [obj.yfoot1;obj.yfoot2];
         end
         
         function guard_d2s = double2SingleGuard(obj,~,pd_x,~) %(obj,t,x,u)
-            if obj.xfoot1 > obj.xfoot2 && pd_x(3) == obj.rest_l1
-                guard_d2s = pd_x(11);
-            elseif obj.xfoot1 < obj.xfoot2 && pd_x(5) == obj.rest_l2
-                guard_d2s = pd_x(9);
+            r1 = sqrt((x(1)-obj.xfoot1)^2+x(2)^2);
+            r2 = sqrt((x(1)-obj.xfoot2)^2+x(2)^2);
+            r1dot = (((pd_x(1)-obj.xfoot1)*pd_x(3))+(pd_x(2)*pd_x(4)))/sqrt((pd_x(1)^2)-(2*obj.xfoot1*pd_x(1))+(pd_x(2)^2)+(obj.xfoot1^2));
+            r2dot = (((pd_x(1)-obj.xfoot2)*pd_x(3))+(pd_x(2)*pd_x(4)))/sqrt((pd_x(1)^2)-(2*obj.xfoot2*pd_x(1))+(pd_x(2)^2)+(obj.xfoot2^2));
+            
+            if obj.xfoot1 > obj.xfoot2 && r1 == obj.rest_l1
+                guard_d2s = r2dot;
+            elseif obj.xfoot1 < obj.xfoot2 && r2 == obj.rest_l2
+                guard_d2s = r1dot;
             end
         end
         
         function guard_s2f = stance2flightGuard(obj,~,ps_x,~) %(obj,t,x,u)
-            guard_s2f = [ps_x(9);ps_x(11)];
-            if ps_x(3) == obj.rest_l1 && ps_x(5) == obj.rest_l2
+            if obj.yfoot1 == 0
+                r1 = sqrt((ps_x(1)-obj.xfoot1)^2+ps_x(2)^2);
+                r2 = obj.rest_l2;
+                r1dot = (((ps_x(1)-obj.xfoot1)*ps_x(3))+(ps_x(2)*ps_x(4)))/sqrt((ps_x(1)^2)-(2*obj.xfoot1*ps_x(1))+(ps_x(2)^2)+(obj.xfoot1^2));
+                r2dot = 0;
+            elseif obj.yfoot2 == 0
+                r1 = obj.rest_l1;
+                r2 = sqrt((ps_x(1)-obj.xfoot2)^2+ps_x(2)^2);
+                r1dot = 0;
+                r2dot = (((ps_x(1)-obj.xfoot2)*ps_x(3))+(ps_x(2)*ps_x(4)))/sqrt((ps_x(1)^2)-(2*obj.xfoot2*ps_x(1))+(ps_x(2)^2)+(obj.xfoot2^2));
+            end
+            
+            guard_s2f = [r1dot;r2dot];
+            if r1 == obj.rest_l1 && r2 == obj.rest_l2
                 guard_s2f = [0;0];
             end
         end
@@ -82,137 +121,98 @@ classdef BipedalSLIP < HybridDrakeSystem
             end
         end
         
-        function [pd_x,mode,status,dpd_x]=single2double(~,mode,~,ps_x,~) %(obj,mode,t,xm,u)
-            pd_x=[ps_x(5)-ps_x(1)*sin(ps_x(2));...
-                ps_x(1)*cos(ps_x(2));...
-                -ps_x(3)*sin(ps_x(2))-ps_x(1)*ps_x(4)*cos(ps_x(2));...
-                ps_x(3)*cos(ps_x(2))-ps_x(1)*ps_x(4)*sin(ps_x(2));];
+        function [pd_x,mode,status,dpd_x]=single2double(obj,mode,~,ps_x,~) %(obj,mode,t,x,u)
+            pd_x=ps_x(1:4);
             if(mode~=ps_mode)
                 error('Incorrect mode');
             else
                 mode=pd_mode;
             end
             status=(pd_x(3)<0);  % terminate if xdot < 0
-            dpd_xdps_x=zeros(4,5);
-            dpd_xdps_x(1,5)=1;
-            dpd_xdps_x(1,1)=-sin(ps_x(2));
-            dpd_xdps_x(1,2)=-ps_x(1)*cos(ps_x(2));
-            dpd_xdps_x(1,5)=1;
-            dpd_xdps_x(2,1)=cos(ps_x(2));
-            dpd_xdps_x(2,2)=-ps_x(1)*sin(ps_x(2));
-            dpd_xdps_x(2,6)=1;
-            dpd_xdps_x(3,1)=-ps_x(4)*cos(ps_x(2));
-            dpd_xdps_x(3,2)=-ps_x(3)*cos(ps_x(2))+ps_x(1)*ps_x(4)*sin(ps_x(2));
-            dpd_xdps_x(3,3)=-sin(ps_x(2));
-            dpd_xdps_x(3,4)=-ps_x(1)*cos(ps_x(2));
-            dpd_xdps_x(4,1)=-ps_x(4)*sin(ps_x(2));
-            dpd_xdps_x(4,2)=-ps_x(3)*sin(ps_x(2))-ps_x(1)*ps_x(4)*cos(ps_x(2));
-            dpd_xdps_x(4,3)=cos(ps_x(2));
-            dpd_xdps_x(4,4)=-ps_x(1)*sin(ps_x(2));
-            dpd_x=[zeros(4,2) dpd_xdps_x zeros(4,1)];
+            
+            r1 = sqrt((x(1)-obj.xfoot1)^2+x(2)^2);
+            r2 = sqrt((x(1)-obj.xfoot2)^2+x(2)^2);
+            theta1 = atan2(x(2),obj.xfoot1-x(1));
+            theta2 = atan2(x(2),obj.xfoot2-x(1));
+            
+            obj.xfoot1 = x+(r1*cos(theta1)); % x position of r1
+            obj.xfoot2 = x+(r2*cos(theta2)); % x position of r2
+            obj.yfoot1 = 0; % y position of r1
+            obj.yfoot2 = 0; % y position of r2
+            
+            F1 = [obj.k*(r1-obj.rest_l1)*cos(theta1);-obj.k*(y(3)-obj.rest_l1)*sin(theta1)];
+            F2 = [obj.k*(r2-obj.rest_l2)*cos(theta2);-obj.k*(y(5)-obj.rest_l2)*sin(theta2)];
+            F3 = [0;-obj.m_hip*obj.g];
+            dpd_x=[ps_x(3:4) (F1+F2+F3)/obj.m_hip];
         end
         
-        function [ps_x,mode,status,dps_x]=double2single(~,mode,~,pd_x,u) %(obj,mode,t,xm,u)
+        function [ps_x,mode,status,dps_x]=double2single(obj,mode,~,pd_x,~) %(obj,mode,t,x,u)
+            ps_x=pd_x(1:4);
             if(mode~=pd_mode)
                 error('Incorrect mode');
             else
                 mode=ps_mode;
             end
-            theta=u;
-            r= pd_x(2)/cos(theta); % = obj.rest_l1 because x(2)-obj.rest_l1*cos(u) = 0
-            ps_x=[r;...
-                theta;...
-                -pd_x(3)*sin(theta)+pd_x(4)*cos(theta);...
-                -(pd_x(3)*cos(theta)+pd_x(4)*sin(theta))/r;...
-                pd_x(1)+r*sin(theta);0;0;0;0;0;0;0]; %pd_x(2)*tan(theta)];
             status=0;
-            if nargout>3
-                dps_xdpd_x=zeros(5,4);
-                dps_xdu=zeros(5,1);
-                dps_xdpd_x(1,2)=1/cos(theta);
-                dps_xdu(1,1)=(pd_x(2))*sin(theta)/cos(theta)^2;
-                %dps_xdpd_x(1,6)=-1/cos(theta);
-                dps_xdu(2,1)=1;
-                dps_xdpd_x(3,3)=-sin(theta);
-                dps_xdpd_x(3,4)=cos(theta);
-                dps_xdu(3,1)=-pd_x(3)*cos(theta)-pd_x(4)*sin(theta);
-                dps_xdpd_x(4,2)=(pd_x(3)*cos(theta)^2+pd_x(4)*sin(theta)*cos(theta))/(pd_x(2))^2;
-                dps_xdpd_x(4,3)=-cos(theta)^2/(pd_x(2));
-                dps_xdpd_x(4,4)=-sin(theta)*cos(theta)/(pd_x(2));
-                dps_xdu(4,1)=-(-pd_x(3)*sin(2*theta)+pd_x(4)*cos(2*theta))/(pd_x(2));
-                %dps_xdpd_x(4,6)=-dps_xdpd_x(4,2);
-                dps_xdpd_x(5,1)=1;
-                dps_xdpd_x(5,2)=tan(theta);
-                %error('still need to update this last one:');
-                dps_xdu(5,1)=pd_x(2)/cos(theta)^2;
-                dps_x=[zeros(5,2) dps_xdpd_x dps_xdu];
+            if pd_x(5) == obj.rest_l2
+                obj.xfoot1 = y(1)+((y(2)*cos(y(4)))/sin(y(4))); % x position of r1
+                obj.yfoot1 = 0; % y position of r1
+                
+                F1 = [obj.k*(y(3)-obj.rest_l1)*cos(y(4));-obj.k*(y(3)-obj.rest_l1)*sin(y(4))];
+                F3 = [0;-obj.m_hip*obj.g];
+                dps_x=[pd_x(3:4) (F1+F3)/obj.m_hip];
+                
+            elseif pd_x(3) == obj.rest_l1
+                obj.xfoot2 = y(1)+((y(2)*cos(y(6)))/sin(y(6))); % x position of r2
+                obj.yfoot2 = 0; % y position of r2
+                
+                F2 = [obj.k*(y(5)-obj.rest_l2)*cos(y(6));-obj.k*(y(5)-obj.rest_l2)*sin(y(6))];
+                F3 = [0;-obj.m_hip*obj.g];
+                dps_x=[pd_x(3:4) (F2+F3)/obj.m_hip];
             end
         end
         
-        function [pf_x,mode,status,dpf_x]=stance2flight(~,mode,~,ps_x,~) %(obj,mode,t,xm,u)
-            pf_x=[ps_x(5)-ps_x(1)*sin(ps_x(2));...
-                ps_x(1)*cos(ps_x(2));...
-                -ps_x(3)*sin(ps_x(2))-ps_x(1)*ps_x(4)*cos(ps_x(2));...
-                ps_x(3)*cos(ps_x(2))-ps_x(1)*ps_x(4)*sin(ps_x(2));];
+        function [pf_x,mode,status,dpf_x]=stance2flight(~,mode,~,ps_x,~) %(obj,mode,t,x,u)
+            pf_x=ps_x(1:4);
             if(mode~=ps_mode)
                 error('Incorrect mode');
             else
                 mode=pf_mode;
             end
             status=(pf_x(3)<0);  % terminate if xdot < 0
-            dpf_xdps_x=zeros(4,5);
-            dpf_xdps_x(1,5)=1;
-            dpf_xdps_x(1,1)=-sin(ps_x(2));
-            dpf_xdps_x(1,2)=-ps_x(1)*cos(ps_x(2));
-            dpf_xdps_x(1,5)=1;
-            dpf_xdps_x(2,1)=cos(ps_x(2));
-            dpf_xdps_x(2,2)=-ps_x(1)*sin(ps_x(2));
-            dpf_xdps_x(2,6)=1;
-            dpf_xdps_x(3,1)=-ps_x(4)*cos(ps_x(2));
-            dpf_xdps_x(3,2)=-ps_x(3)*cos(ps_x(2))+ps_x(1)*ps_x(4)*sin(ps_x(2));
-            dpf_xdps_x(3,3)=-sin(ps_x(2));
-            dpf_xdps_x(3,4)=-ps_x(1)*cos(ps_x(2));
-            dpf_xdps_x(4,1)=-ps_x(4)*sin(ps_x(2));
-            dpf_xdps_x(4,2)=-ps_x(3)*sin(ps_x(2))-ps_x(1)*ps_x(4)*cos(ps_x(2));
-            dpf_xdps_x(4,3)=cos(ps_x(2));
-            dpf_xdps_x(4,4)=-ps_x(1)*sin(ps_x(2));
-            dpf_x=[zeros(4,2) dpf_xdps_x zeros(4,1)];
+            
+            obj.xfoot1 = y(1)+(y(3)*cos(y(4))); % x position of r1
+            obj.yfoot1 = y(2)-sqrt((y(3)^2)-((y(1)-obj.xfoot1)^2)); % y position of r1
+            obj.xfoot2 = y(1)+(y(5)*cos(y(6))); % x position of r2
+            obj.yfoot2 = y(2)-sqrt((y(5)^2)-((y(1)-obj.xfoot2)^2)); % y position of r2
+            
+            F3 = [0;-obj.m_hip*obj.g];
+            dpf_x=[ps_x(3:4) (F3)/obj.m_hip];
         end
         
-        function [ps_x,mode,status,dps_x]=flight2stance(~,mode,~,pf_x,u) %(obj,mode,t,xm,u)
+        function [ps_x,mode,status,dps_x]=flight2stance(obj,mode,~,pf_x,~) %(obj,mode,t,x,u)
+            ps_x=pf_x(1:4);
             if(mode~=pf_mode)
                 error('Incorrect mode');
             else
                 mode=ps_mode;
             end
-            theta=u;
-            r= pf_x(2)/cos(theta); % = obj.rest_l1 because x(2)-obj.rest_l1*cos(u) = 0
-            ps_x=[r;...
-                theta;...
-                -pf_x(3)*sin(theta)+pf_x(4)*cos(theta);...
-                -(pf_x(3)*cos(theta)+pf_x(4)*sin(theta))/r;...
-                pf_x(1)+r*sin(theta);0;0;0;0;0;0;0]; %pf_x(2)*tan(theta)];
             status=0;
-            if nargout>3
-                dps_xdpf_x=zeros(5,4);
-                dps_xdu=zeros(5,1);
-                dps_xdpf_x(1,2)=1/cos(theta);
-                dps_xdu(1,1)=(pf_x(2))*sin(theta)/cos(theta)^2;
-                %dps_xdpf_x(1,6)=-1/cos(theta);
-                dps_xdu(2,1)=1;
-                dps_xdpf_x(3,3)=-sin(theta);
-                dps_xdpf_x(3,4)=cos(theta);
-                dps_xdu(3,1)=-pf_x(3)*cos(theta)-pf_x(4)*sin(theta);
-                dps_xdpf_x(4,2)=(pf_x(3)*cos(theta)^2+pf_x(4)*sin(theta)*cos(theta))/(pf_x(2))^2;
-                dps_xdpf_x(4,3)=-cos(theta)^2/(pf_x(2));
-                dps_xdpf_x(4,4)=-sin(theta)*cos(theta)/(pf_x(2));
-                dps_xdu(4,1)=-(-pf_x(3)*sin(2*theta)+pf_x(4)*cos(2*theta))/(pf_x(2));
-                %dps_xdpf_x(4,6)=-dps_xdpf_x(4,2);
-                dps_xdpf_x(5,1)=1;
-                dps_xdpf_x(5,2)=tan(theta);
-                %error('still need to update this last one:');
-                dps_xdu(5,1)=pf_x(2)/cos(theta)^2;
-                dps_x=[zeros(5,2) dps_xdpf_x dps_xdu];
+            if obj.xfoot1 > obj.xfoot2
+                obj.xfoot1 = y(1)+((y(2)*cos(y(4)))/sin(y(4))); % x position of r1
+                obj.yfoot1 = 0; % y position of r1
+                
+                F1 = [obj.k*(y(3)-obj.rest_l1)*cos(y(4));-obj.k*(y(3)-obj.rest_l1)*sin(y(4))];
+                F3 = [0;-obj.m_hip*obj.g];
+                dps_x=[pf_x(3:4) (F1+F3)/obj.m_hip];
+                
+            elseif obj.xfoot1 < obj.xfoot2
+                obj.xfoot2 = y(1)+((y(2)*cos(y(6)))/sin(y(6))); % x position of r2
+                obj.yfoot2 = 0; % y position of r2
+                
+                F2 = [obj.k*(y(5)-obj.rest_l2)*cos(y(6));-obj.k*(y(5)-obj.rest_l2)*sin(y(6))];
+                F3 = [0;-obj.m_hip*obj.g];
+                dps_x=[pf_x(3:4) (F2+F3)/obj.m_hip];
             end
         end
         
