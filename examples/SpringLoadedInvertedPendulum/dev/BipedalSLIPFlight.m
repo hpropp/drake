@@ -3,15 +3,12 @@ classdef BipedalSLIPFlight < DrakeSystem
     % if no flight function used, it is walking; if there is one, then running
     
     properties
-        rest_l1; % rest length of leg spring #2 (m)
-        rest_l2; % rest length of leg spring #2 (m)
+        r_rest; % rest length of leg springs (m)
         m_hip; % mass (kg)
         g; % gravity (m/s^2)
         
         xfoot1; % x position of r1
         xfoot2; % x position of r2
-        yfoot1; % y position of r1
-        yfoot2; % y position of r2
     end
     
     methods
@@ -26,15 +23,12 @@ classdef BipedalSLIPFlight < DrakeSystem
                 true, ... % direct feedthrough
                 true); % time invariant
             
-            obj.rest_l1 = slip.rest_l1;
-            obj.rest_l2 = slip.rest_l2;
+            obj.r_rest = slip.r_rest;
             obj.m_hip = slip.m_hip;
             obj.g = slip.g;
             
             obj.xfoot1 = slip.xfoot1; % x position of r1
             obj.xfoot2 = slip.xfoot2; % x position of r2
-            obj.yfoot1 = slip.yfoot1; % y position of r1
-            obj.yfoot2 = slip.yfoot2; % y position of r2
             
             obj = setStateFrame(obj,CoordinateFrame('BipedalSLIPFlight',4,'x',{'x','y','xdot','ydot'}));
             
@@ -48,8 +42,8 @@ classdef BipedalSLIPFlight < DrakeSystem
         end
         
         function y = output(obj,~,x,~) %(obj,t,x,u)
-            r1 = obj.rest_l1;
-            r2 = obj.rest_l2;
+            r1 = obj.r_rest;
+            r2 = obj.r_rest;
             theta1 = atan2(sqrt((r1^2)-((x(1)-obj.xfoot1)^2)),obj.xfoot1-x(1));
             theta2 = atan2(sqrt((r2^2)-((x(1)-obj.xfoot2)^2)),obj.xfoot2-x(1));
             
