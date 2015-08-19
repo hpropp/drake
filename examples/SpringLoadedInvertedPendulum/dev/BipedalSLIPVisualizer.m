@@ -1,12 +1,12 @@
 classdef BipedalSLIPVisualizer < Visualizer
     % the visualization of the bipedalSLIP model
-
+    
     methods
         function obj = BipedalSLIPVisualizer(slip)
             typecheck(slip,'BipedalSLIP');
             obj = obj@Visualizer(getOutputFrame(slip));
         end
-
+        
         function draw(obj,~,x) %(obj,t,x) where x is a 1x4 matrix
             hip = x(1:2); % position of the hip
             r1 = x(3);

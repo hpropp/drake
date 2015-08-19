@@ -6,9 +6,6 @@ classdef BipedalSLIPFlight < DrakeSystem
         r_rest; % rest length of leg springs (m)
         m_hip; % mass (kg)
         g; % gravity (m/s^2)
-        
-        xfoot1; % x position of r1
-        xfoot2; % x position of r2
     end
     
     methods
@@ -26,9 +23,6 @@ classdef BipedalSLIPFlight < DrakeSystem
             obj.r_rest = slip.r_rest;
             obj.m_hip = slip.m_hip;
             obj.g = slip.g;
-            
-            obj.xfoot1 = slip.xfoot1; % x position of r1
-            obj.xfoot2 = slip.xfoot2; % x position of r2
             
             obj = setStateFrame(obj,CoordinateFrame('BipedalSLIPFlight',4,'x',{'x','y','xdot','ydot'}));
             

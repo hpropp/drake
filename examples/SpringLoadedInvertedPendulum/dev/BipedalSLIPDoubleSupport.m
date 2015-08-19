@@ -6,6 +6,9 @@ classdef BipedalSLIPDoubleSupport < DrakeSystem
         m_hip; % mass (kg)
         k; % stiffness spring coefficient (aka elastic restoring force)
         g; % gravity (m/s^2)
+        
+        r1atground;
+        r2atground;
     end
     
     methods
@@ -25,6 +28,9 @@ classdef BipedalSLIPDoubleSupport < DrakeSystem
             obj.k = slip.k;
             obj.g = slip.g;
             
+            obj.r1atground = slip.r1atground;
+            obj.r2atground = slip.r2atground;
+            
             obj = setStateFrame(obj,CoordinateFrame('BipedalSLIPDoubleSupport',8,'x',{'x','y','xfoot1','yfoot1','xfoot2','yfoot2','xdot','ydot'}));
             
             obj = setInputFrame(obj,getInputFrame(slip));
@@ -43,7 +49,7 @@ classdef BipedalSLIPDoubleSupport < DrakeSystem
             xdot = [x(7:8);0;0;0;0;(F1+F2+F3)/obj.m_hip];
         end
         
-        function y = output(~,~,x,~) %(obj,t,x,u)
+        function y = output(~,t,x,~) %(obj,t,x,u)
             r1 = sqrt((x(1)-x(3))^2+x(2)^2);
             r2 = sqrt((x(1)-x(5))^2+x(2)^2);
             theta1 = atan2(x(2),x(3)-x(1));
