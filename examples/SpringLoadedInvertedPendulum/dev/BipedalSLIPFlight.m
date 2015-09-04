@@ -1,11 +1,14 @@
 classdef BipedalSLIPFlight < DrakeSystem
     % where both legs are in the air
     % if no flight function used, it is walking; if there is one, then running
+    % 'r1' is always behind 'r2'
     
     properties
         r_rest; % rest length of leg springs (m)
         m_hip; % mass (kg)
         g; % gravity (m/s^2)
+        alpha0_r2;
+        alpha0_r1;
     end
     
     methods
@@ -23,6 +26,8 @@ classdef BipedalSLIPFlight < DrakeSystem
             obj.r_rest = slip.r_rest;
             obj.m_hip = slip.m_hip;
             obj.g = slip.g;
+            obj.alpha0_r2 = slip.alpha0_r2;
+            obj.alpha0_r1 = slip.alpha0_r1;
             
             obj = setStateFrame(obj,CoordinateFrame('BipedalSLIPFlight',4,'x',{'x','y','xdot','ydot'}));
             
@@ -30,26 +35,26 @@ classdef BipedalSLIPFlight < DrakeSystem
             obj = setOutputFrame(obj,getOutputFrame(slip));
         end
         
-        function xdot = dynamics(obj,~,x,~) %(obj,t,x,u)
-            F3 = [0;-obj.m_hip*obj.g];
-            xdot = [x(3:4);(F3)/obj.m_hip];
+        function xdot = dynamics(obj,t,x,u) %(obj,t,x,u)
+            F1 = [0;-obj.m_hip*obj.g];
+            xdot = [x(3:4);(F1)/obj.m_hip];
         end
         
-        function y = output(obj,~,x,~) %(obj,t,x,u)
+        function y = output(obj,t,x,u) %(obj,t,x,u)
             r1 = obj.r_rest;
             r2 = obj.r_rest;
-            theta1 = atan2(sqrt((r1^2)-((x(1)-obj.xfoot1)^2)),obj.xfoot1-x(1));
-            theta2 = atan2(sqrt((r2^2)-((x(1)-obj.xfoot2)^2)),obj.xfoot2-x(1));
+            theta1 = obj.alpha0_r1;
+            theta2 = obj.alpha0_r2;
             
             r1dot = 0;
-            theta1dot = x(3)./sqrt((r1^2)-((x(1)-obj.xfoot1)^2));
+            theta1dot = 0;
             r2dot = 0;
-            theta2dot = x(3)./sqrt((r2^2)-((x(1)-obj.xfoot2)^2));
+            theta2dot = 0;
             
             y = [x(1:2);r1;theta1;r2;theta2;x(3:4);r1dot;theta1dot;r2dot;theta2dot];
         end
         
-        function x0 = getInitialState(~) %(obj)
+        function  x0=getInitialState(obj)
             x0 = [0.1*randn;20*randn;0];
         end
     end

@@ -7,12 +7,12 @@ classdef BipedalSLIPVisualizer < Visualizer
             obj = obj@Visualizer(getOutputFrame(slip));
         end
         
-        function draw(obj,~,x) %(obj,t,x) where x is a 1x4 matrix
-            hip = x(1:2); % position of the hip
-            r1 = x(3);
-            theta1 = x(4);
-            r2 = x(5);
-            theta2 = x(6);
+        function draw(obj,t,y) %(obj,t,y)
+            hip = y(1:2); % position of the hip
+            r1 = y(3);
+            theta1 = y(4);
+            r2 = y(5);
+            theta2 = y(6);
             
             clf
             
@@ -34,7 +34,7 @@ classdef BipedalSLIPVisualizer < Visualizer
             lpts = repmat(hip,1,numel(lx))+R2*[(r2)*lx;ly];
             plot(lpts(1,:),lpts(2,:),'Color',[0 0 0],'LineWidth',2);
             
-            
+            % the hip
             t = 0:0.1:2*pi;
             line(hip(1)+0.15*sin(t),hip(2)+0.15*cos(t),'Color',[0 0 0]);
             fill(hip(1)+0.15*sin(t),hip(2)+0.15*cos(t),MITlightgray); %[ 0.502 1.000 1.000 ]);
